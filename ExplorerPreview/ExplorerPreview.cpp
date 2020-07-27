@@ -6,18 +6,18 @@
 
 CComPtr<IPreviewHandler> handler;
 
-class CTest : public IUnknown
+class CFrame : public IPreviewHandlerFrame
 {
 	LONG m_ref;
 
 public:
-	CTest() : m_ref(1) { }
+	CFrame() : m_ref(1) { }
 
 	IFACEMETHODIMP QueryInterface(REFIID riid, void** ppv)
 	{
-		if (riid == IID_IUnknown)
+		if (riid == IID_IUnknown || riid == IID_IPreviewHandlerFrame)
 		{
-			*ppv = static_cast<IUnknown*>(this);
+			*ppv = static_cast<IPreviewHandlerFrame*>(static_cast<IUnknown*>(this));
 			AddRef();
 			return S_OK;
 		}
@@ -31,9 +31,21 @@ public:
 
 	IFACEMETHODIMP_(ULONG) AddRef() { return InterlockedIncrement(&m_ref); }
 	IFACEMETHODIMP_(ULONG) Release() { LONG reg = InterlockedDecrement(&m_ref); if (!reg) delete this; return reg; }
+
+	IFACEMETHODIMP GetWindowContext(PREVIEWHANDLERFRAMEINFO* pinfo)
+	{
+		ATLTRACE(L"GetWindowContext");
+		return S_OK;
+	}
+
+	IFACEMETHODIMP TranslateAccelerator(MSG* pmsg)
+	{
+		ATLTRACE(L"TranslateAccelerator");
+		return S_OK;
+	}
 };
 
-CTest test;
+CFrame test;
 
 template<typename DispInterface>
 class CDispInterfaceBase : public DispInterface
@@ -152,12 +164,6 @@ class WebBrowserEvents : public CDispInterfaceBase<DWebBrowserEvents2>
 					SHCLSIDFromString(sclsid, &clsid);
 					CHECKHR(handler.CoCreateInstance(clsid, NULL, CLSCTX_LOCAL_SERVER));
 
-					CComPtr<IObjectWithSite> site;
-					if (SUCCEEDED(handler->QueryInterface(&site)))
-					{
-						site->SetSite(&test);
-					}
-
 					CComPtr<IInitializeWithItem> iitem;
 					if (SUCCEEDED(handler->QueryInterface(&iitem)))
 					{
@@ -181,12 +187,16 @@ class WebBrowserEvents : public CDispInterfaceBase<DWebBrowserEvents2>
 						}
 					}
 
+					CComPtr<IObjectWithSite> site;
+					if (SUCCEEDED(handler->QueryInterface(&site)))
+					{
+						site->SetSite(&test);
+					}
+
 					RECT rc;
 					GetClientRect(m_hwnd, &rc);
 					CHECKHR(handler->SetWindow(m_hwnd, &rc));
 					CHECKHR(handler->DoPreview());
-					HWND hwnd;
-					handler->QueryFocus(&hwnd);
 				}
 			}
 		}
@@ -294,6 +304,12 @@ int APIENTRY wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmd
 	MSG msg;
 	while (GetMessage(&msg, nullptr, 0, 0))
 	{
+		if (handler)
+		{
+			//handler->TranslateAcceleratorW(&msg);
+			//HWND hwnd;
+			//handler->QueryFocus(&hwnd);
+		}
 		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
 		{
 			TranslateMessage(&msg);
